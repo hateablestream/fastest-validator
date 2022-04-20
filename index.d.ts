@@ -849,10 +849,23 @@ export type ValidationSchema<T = any> = {
 		[key in keyof T]: ValidationRule | undefined | any;
 	};
 
+
+export type IsRoot<T> = ('$$root' extends keyof T ? true : false) 
+export type RemoveFlags<T> = (T extends `$$${infer _flag}` ? never : T);
+type StringKeyOf<T> = keyof T & string;
+
+export type ValidationField<T = string, _Keys extends StringKeyOf<T> = StringKeyOf<T>> = 
+  T extends Record<string, unknown>
+    ? {
+      [K in _Keys]: T[K] extends Record<'properties', infer NestedProps> | Record<'props', infer NestedProps>
+        ? `${K}.${ValidationField<NestedProps>}` | K
+        : K
+      }[_Keys]
+    : string
 /**
  * Structure with description of validation error message
  */
-export interface ValidationError {
+export interface ValidationError<T = unknown> {
 	/**
 	 * Name of validation rule that generates this message
 	 */
@@ -860,7 +873,7 @@ export interface ValidationError {
 	/**
 	 * Field that catch validation error
 	 */
-	field: string;
+	field: IsRoot<T> extends true ? string : RemoveFlags<ValidationField<T>> & (string & {})
 	/**
 	 * Description of current validation error
 	 */
@@ -975,13 +988,13 @@ export interface CheckFunctionOptions {
 	meta?: object | null;
 }
 
-export interface SyncCheckFunction {
-	(value: any, opts?: CheckFunctionOptions): true | ValidationError[]
+export interface SyncCheckFunction<T = unknown> {
+	(value: any, opts?: CheckFunctionOptions): true | ValidationError<T>[]
 	async: false
 }
 
-export interface AsyncCheckFunction {
-	(value: any, opts?: CheckFunctionOptions): Promise<true | ValidationError[]>
+export interface AsyncCheckFunction<T = unknown> {
+	(value: any, opts?: CheckFunctionOptions): Promise<true | ValidationError<T>[]>
 	async: true
 }
 
@@ -1060,8 +1073,8 @@ export default class Validator {
 	 * @return {(value: any) => (true | ValidationError[])} function that can be used next for validation of current schema
 	 */
 	compile<T = any>(
-		schema: ValidationSchema<T> | ValidationSchema<T>[]
-	): SyncCheckFunction | AsyncCheckFunction;
+		schema: T & ValidationSchema<T> | T & ValidationSchema<T>[]
+	): SyncCheckFunction<T> | AsyncCheckFunction<T>;
 
 	/**
 	 * Native validation method to validate obj
